@@ -2,10 +2,10 @@
 
 use std::{fs::File, io::BufReader};
 use csv::ReaderBuilder;
-use rayon::prelude::{IntoParallelRefMutIterator, ParallelIterator, IndexedParallelIterator};
+use rayon::{prelude::{IntoParallelRefMutIterator, ParallelIterator, ParallelBridge, IntoParallelRefIterator, IndexedParallelIterator}, string, iter::plumbing::Folder};
 use std::collections::HashMap;
 use rand::seq::SliceRandom;
-use super::data_type::DataType;
+use super::data_type::{DataType, length};
 
 //TODO -- we still need to find a way to normalize a external point -- in progress transform , 
 //we basically store the history of what happned to the each column before and then we are going to do the same on then present.
@@ -21,7 +21,7 @@ pub struct DataFrame {
 }    
 
 //data frame can be spitted and trained on.
-pub trait TrainTestSplit {
+pub trait train_test_split {
     fn train_test_split(&self , test_size : f32 , target_index : usize , shuffle : bool ) -> (Vec<Vec<f32>> , DataType , Vec<Vec<f32>> , DataType);
 }
 
@@ -56,6 +56,65 @@ pub fn get_headers(path : &str , which_features: &Vec<usize> , number_of_feature
 
 //describing the data frame in different ways.
 impl DataFrame {
+
+    pub fn new() -> Self {
+        DataFrame { 
+            data: vec![],
+            headers: vec![],
+            number_of_features: 0,
+            number_of_samples: 0,
+            max_vector:vec![],
+            min_vector: vec![],
+            normalized: false 
+        }
+    }
+
+    pub fn new_column(&mut self, column : DataType, index : usize) {
+        match &column {
+            DataType::Strings(temp) => {
+                self.max_vector.push(f32::NAN);
+                self.min_vector.push(f32::NAN);
+            },
+            DataType::Floats(temp) => {
+                let mut min = f32::MAX;
+                let mut max = f32::MIN;
+                for value in temp.iter() {
+                    if (*value < min) {
+                        min = *value;
+                    }
+                    if (*value > max) {
+                        max = *value;
+                    }
+                }
+                self.min_vector.push(min);
+                self.max_vector.push(max);
+            },
+            DataType::Category(temp) => {
+                let mut min = 255_u8;
+                let mut max = 0_u8;
+                for value in temp.iter() {
+                    if (*value < min) {
+                        min = *value;
+                    }
+                    if (*value > max) {
+                        max = *value;
+                    }
+                }
+                self.min_vector.push(min as f32);
+                self.max_vector.push(max as f32);
+            },
+        }
+        if (self.number_of_samples == 0) {//the first column
+            self.number_of_samples = column.len().try_into().unwrap();
+        } else {
+            if (self.number_of_samples != column.len() as u32) {
+                panic!("Column length mis-match during insertion of new 'DataType' into the DataFrame");
+            }
+        }
+        self.number_of_features += 1;
+        self.headers.push(String::from(" "));
+        self.data.insert(index, column);
+    }
 
     pub fn head(&self) {
 
@@ -106,7 +165,7 @@ impl DataFrame {
             
             match i {
                 DataType::Floats(temp) => {
-                    //here we are printing the type column name , type , max , min , avg_value ;#######todo : 25% , 50 % ,75%
+                    //here we are printing the type column name , type , max , min , avg_value ;todo : 25% , 50 % ,75%
                     let mean = 0.0_f32;
                     
                     let column_number = format!("{:number_width$}", column_index + 1);
@@ -321,7 +380,7 @@ impl DataFrame {
     }
 
     //here we take the name of the name of the column and turn the values into a particular encoding.
-    //and also importantly the number of unique values should not exceed 256.
+    //and also the number of unique values should not exceed 256.
     pub fn encode(&mut self , column_name : &str) {
         //warn!("You can only have upto 256 unique values for this to work or else it is going to throw an error because overflow");
         //getting the index at which the column is located.
@@ -434,7 +493,7 @@ impl DataFrame {
         let mut min_max = vec![0.0_f32 ; number_of_features_here];
 
         for i in 0..number_of_features_here {
-            if !self.min_vector[i].is_nan() {
+            if self.min_vector[i] != f32::NAN {
                 min_max[i] = self.max_vector[i] - self.min_vector[i];
             } else {
                 min_max[i] = f32::NAN;
@@ -729,6 +788,7 @@ impl DataFrame {
 
 //transform point
 impl DataFrame {
+    //TODO.........
     ///if you transform the data set before the train test split then you need to do the 
     ///exact transformation on an external point if you want to predict it, this functions should be used for it.
     //first we are going to store the differrent transformations then we are going to apply that to the new point here.
@@ -740,3 +800,4 @@ impl DataFrame {
     //replace a value witch meets certain conditions with an other value like a formula.
     //creating new data columns by adding values of other two columns.--will be helpful once we implemented the heatmaps for the relation between two heatmaps.
 }
+

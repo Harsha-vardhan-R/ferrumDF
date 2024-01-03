@@ -1,6 +1,6 @@
 [package]
 name = "ferrumDF"
-version = "0.0.9"
+version = "0.1.1"
 authors = ["Gandalf the grey"]
 edition = "2021"
 description = "A data frame library written to work with my ml crate ferrumML"
