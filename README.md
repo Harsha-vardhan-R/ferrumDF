@@ -72,4 +72,4 @@ fn opening_df_3() {
 }
 
 ```
-The Library is written to work with data frames larger than 1GB. Chunk reading will be introduced in future versions.
+The Library is written to work with data frames smaller than 1GB. Chunk reading will be introduced in future versions.
